@@ -1,9 +1,10 @@
 import { COMM_TYPE_COLORS, COMM_TYPE_LABELS } from '../../lib/constants'
+import { METRIC_MAP } from '../../lib/metrics'
 import { fmtDateTimeMin, relativeTime, cx } from '../../lib/utils'
 import type { Device } from '../../types'
 import { StatusDot } from '../ui/StatusDot'
 
-export type DeviceSortKey = 'name' | 'lastReportAt' | 'currentTemp' | 'currentHumidity'
+export type DeviceSortKey = 'name' | 'lastReportAt'
 
 export interface DeviceSort {
   key: DeviceSortKey
@@ -13,8 +14,6 @@ export interface DeviceSort {
 const SORTABLE: Array<{ key: DeviceSortKey; label: string }> = [
   { key: 'name', label: '设备名称' },
   { key: 'lastReportAt', label: '最后上报时间' },
-  { key: 'currentTemp', label: '当前温度' },
-  { key: 'currentHumidity', label: '当前湿度' },
 ]
 
 function SortHeader({
@@ -69,6 +68,7 @@ export function DeviceTable({
                 onClick={() => onSort(s.key)}
               />
             ))}
+            <th className="th">传感器指标</th>
             <th className="th">通信方式</th>
             <th className="th">状态</th>
             <th className="th">所在位置</th>
@@ -86,23 +86,15 @@ export function DeviceTable({
                 <div className="font-mono text-xs text-slate-500">{d.code}</div>
               </td>
               <td className="td font-mono text-slate-400">{fmtDateTimeMin(d.lastReportAt)}</td>
-              <td className="td font-mono tabular-nums">
-                {d.currentTemp != null ? (
-                  <span className={d.currentTemp > 35 || d.currentTemp < 5 ? 'text-red-300' : 'text-slate-300'}>
-                    {d.currentTemp.toFixed(1)}℃
-                  </span>
-                ) : (
-                  <span className="text-slate-600">—</span>
-                )}
-              </td>
-              <td className="td font-mono tabular-nums">
-                {d.currentHumidity != null ? (
-                  <span className={d.currentHumidity > 80 || d.currentHumidity < 20 ? 'text-red-300' : 'text-slate-300'}>
-                    {d.currentHumidity.toFixed(1)}%
-                  </span>
-                ) : (
-                  <span className="text-slate-600">—</span>
-                )}
+              <td className="td">
+                <div className="flex flex-wrap gap-1">
+                  {d.metrics.map((m) => (
+                    <span key={m} className="chip border border-white/5 bg-white/5 text-slate-300">
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: METRIC_MAP[m].color }} />
+                      {METRIC_MAP[m].label}
+                    </span>
+                  ))}
+                </div>
               </td>
               <td className="td">
                 <span className="inline-flex items-center gap-1.5">

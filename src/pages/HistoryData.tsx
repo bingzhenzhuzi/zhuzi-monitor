@@ -22,8 +22,8 @@ function exportCsv(rows: SensorDataPoint[], nameById: Map<string, string>) {
   const lines = rows.map((p) => [
     fmtDateTime(p.reportedAt),
     nameById.get(p.deviceId) ?? p.deviceId,
-    p.temperature.toFixed(1),
-    p.humidity.toFixed(1),
+    p.temperature != null ? p.temperature.toFixed(1) : '',
+    p.humidity != null ? p.humidity.toFixed(1) : '',
     p.signalStrength != null ? String(p.signalStrength) : '',
   ])
   const csv = '﻿' + [header, ...lines].map((r) => r.map((c) => `"${c}"`).join(',')).join('\n')
@@ -72,7 +72,7 @@ export function HistoryData() {
 
   const chart = useMemo(() => {
     const flat = history.data ?? []
-    const buckets = new Map<number, Record<string, number | string> & { __t: number }>()
+    const buckets = new Map<number, Record<string, number | string | null> & { __t: number }>()
     for (const p of flat) {
       const t = new Date(p.reportedAt).getTime()
       const bucket = Math.floor(t / 300000) * 300000
@@ -194,8 +194,8 @@ export function HistoryData() {
                   <tr key={p.id} className="border-b border-white/5">
                     <td className="td font-mono text-slate-400">{fmtDateTime(p.reportedAt)}</td>
                     <td className="td text-slate-300">{nameById.get(p.deviceId) ?? p.deviceId}</td>
-                    <td className="td font-mono tabular-nums">{p.temperature.toFixed(1)}℃</td>
-                    <td className="td font-mono tabular-nums">{p.humidity.toFixed(1)}%</td>
+                    <td className="td font-mono tabular-nums">{p.temperature != null ? `${p.temperature.toFixed(1)}℃` : '—'}</td>
+                    <td className="td font-mono tabular-nums">{p.humidity != null ? `${p.humidity.toFixed(1)}%` : '—'}</td>
                     <td className="td font-mono tabular-nums">{p.signalStrength != null ? `${p.signalStrength}%` : '—'}</td>
                   </tr>
                 ))}

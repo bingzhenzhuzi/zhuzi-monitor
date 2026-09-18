@@ -9,8 +9,9 @@ import { Loading, ErrorState, EmptyState } from '../components/ui/feedback'
 import { SensorLineChart, type ChartLine } from '../components/charts/SensorLineChart'
 import { MiniTrendLine } from '../components/charts/MiniTrendLine'
 import { COMM_TYPE_COLORS, COMM_TYPE_LABELS } from '../lib/constants'
+import { METRIC_MAP, getCurrent, getPoint, fmtMetric } from '../lib/metrics'
 import { fmtDateTime, fmtDateTimeMin, fmtTime, cx } from '../lib/utils'
-import type { SensorDataPoint } from '../types'
+import type { MetricKey, SensorDataPoint } from '../types'
 
 const RANGES = [1, 6, 24] as const
 
@@ -21,6 +22,16 @@ const REFRESH_OPTIONS = [
   { label: '每 30 秒', value: 30000 },
 ]
 
+const DEFAULT_METRICS: MetricKey[] = ['temperature', 'humidity']
+
+/** 指标异常判定（仅温湿度有阈值，新指标后续扩展） */
+function isAbnormal(m: MetricKey, v: number | null): boolean {
+  if (v == null) return false
+  if (m === 'temperature') return v > 35 || v < 5
+  if (m === 'humidity') return v > 80 || v < 20
+  return false
+}
+
 export function DeviceDetail() {
   const { id } = useParams<{ id: string }>()
   const [range, setRange] = useState<number>(6)
@@ -29,27 +40,38 @@ export function DeviceDetail() {
   const device = useDevice(id)
   const series = useSensorSeries(id, range, refresh || undefined)
 
-  const chartLines: ChartLine[] = [
-    { key: '温度', name: '温度(℃)', color: '#f97316' },
-    { key: '湿度', name: '湿度(%)', color: '#22d3ee' },
-  ]
+  const metrics: MetricKey[] = device.data?.metrics?.length ? device.data.metrics : DEFAULT_METRICS
+
+  const chartLines: ChartLine[] = useMemo(
+    () =>
+      metrics.map((m) => ({
+        key: m,
+        name: `${METRIC_MAP[m].label}(${METRIC_MAP[m].unit})`,
+        color: METRIC_MAP[m].color,
+      })),
+    [metrics],
+  )
 
   const chartData = useMemo(
     () =>
-      (series.data ?? []).map((p) => ({
-        time: range >= 6 ? fmtDateTimeMin(p.reportedAt) : fmtTime(p.reportedAt),
-        温度: p.temperature,
-        湿度: p.humidity,
-      })),
-    [series.data, range],
+      (series.data ?? []).map((p) => {
+        const row: Record<string, string | number | null> = {
+          time: range >= 6 ? fmtDateTimeMin(p.reportedAt) : fmtTime(p.reportedAt),
+        }
+        for (const m of metrics) row[m] = getPoint(p, m)
+        return row
+      }),
+    [series.data, range, metrics],
   )
 
-  const tempValues = useMemo(() => (series.data ?? []).map((p) => p.temperature), [series.data])
-  const humValues = useMemo(() => (series.data ?? []).map((p) => p.humidity), [series.data])
+  const trendByMetric = useMemo(() => {
+    const map: Record<string, number[]> = {}
+    for (const m of metrics) map[m] = (series.data ?? []).map((p) => getPoint(p, m) ?? 0)
+    return map
+  }, [series.data, metrics])
 
   const recentLogs = useMemo(() => {
-    const reversed = [...(series.data ?? [])].reverse().slice(0, 12)
-    return reversed
+    return [...(series.data ?? [])].reverse().slice(0, 12)
   }, [series.data])
 
   if (device.isLoading) return <Loading label="正在加载设备…" />
@@ -85,26 +107,35 @@ export function DeviceDetail() {
           <InfoRow label="安装位置" value={d.location ?? '—'} />
           <InfoRow label="上线时间" value={fmtDateTime(d.onlineSince)} />
           <InfoRow label="最后上报" value={fmtDateTime(d.lastReportAt)} />
+          <InfoRow
+            label="传感器指标"
+            value={
+              <span className="flex flex-wrap gap-1">
+                {metrics.map((m) => (
+                  <span key={m} className="chip border border-white/5 bg-white/5 text-slate-300">
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: METRIC_MAP[m].color }} />
+                    {METRIC_MAP[m].label}
+                  </span>
+                ))}
+              </span>
+            }
+          />
         </div>
       </Card>
 
       {/* 实时数据面板 */}
       <Card title="实时数据">
         <div className="grid gap-4 sm:grid-cols-3">
-          <RealtimeTile
-            label="温度"
-            value={d.currentTemp != null ? `${d.currentTemp.toFixed(1)}℃` : '—'}
-            color="#f97316"
-            trend={tempValues}
-            abnormal={d.currentTemp != null && (d.currentTemp > 35 || d.currentTemp < 5)}
-          />
-          <RealtimeTile
-            label="湿度"
-            value={d.currentHumidity != null ? `${d.currentHumidity.toFixed(1)}%` : '—'}
-            color="#22d3ee"
-            trend={humValues}
-            abnormal={d.currentHumidity != null && (d.currentHumidity > 80 || d.currentHumidity < 20)}
-          />
+          {metrics.map((m) => (
+            <RealtimeTile
+              key={m}
+              label={METRIC_MAP[m].label}
+              value={fmtMetric(m, getCurrent(d, m))}
+              color={METRIC_MAP[m].color}
+              trend={trendByMetric[m] ?? []}
+              abnormal={isAbnormal(m, getCurrent(d, m))}
+            />
+          ))}
           <div className="card border border-white/5 bg-base-900 p-4">
             <div className="text-xs text-slate-400">信号强度</div>
             <div className="mt-1 font-mono text-3xl font-semibold tabular-nums text-slate-200">
@@ -165,8 +196,9 @@ export function DeviceDetail() {
               <thead>
                 <tr className="border-b border-white/5">
                   <th className="th">上报时间</th>
-                  <th className="th">温度</th>
-                  <th className="th">湿度</th>
+                  {metrics.map((m) => (
+                    <th key={m} className="th">{METRIC_MAP[m].label}</th>
+                  ))}
                   <th className="th">信号强度</th>
                 </tr>
               </thead>
@@ -174,8 +206,9 @@ export function DeviceDetail() {
                 {recentLogs.map((log: SensorDataPoint) => (
                   <tr key={log.id} className="border-b border-white/5">
                     <td className="td font-mono text-slate-400">{fmtDateTime(log.reportedAt)}</td>
-                    <td className="td font-mono tabular-nums">{log.temperature.toFixed(1)}℃</td>
-                    <td className="td font-mono tabular-nums">{log.humidity.toFixed(1)}%</td>
+                    {metrics.map((m) => (
+                      <td key={m} className="td font-mono tabular-nums">{fmtMetric(m, getPoint(log, m))}</td>
+                    ))}
                     <td className="td font-mono tabular-nums">{log.signalStrength != null ? `${log.signalStrength}%` : '—'}</td>
                   </tr>
                 ))}

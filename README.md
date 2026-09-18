@@ -1,12 +1,12 @@
 # 竹子嵌入式设备监控平台
 
-面向设备管理员的嵌入式设备远程监控平台，支持 WiFi、以太网、蜂窝网络、蓝牙、NB-IoT 等多种通信方式，实时采集并展示温度、湿度等传感器数据。深色科技风仪表盘，一屏掌控全局设备状态。
+面向设备管理员的嵌入式设备远程监控平台，支持 WiFi、以太网、蜂窝网络、蓝牙、NB-IoT 等多种通信方式，实时采集并展示温度、湿度、加速度、光照强度、压力、液位、分贝、距离等 8 类传感器数据。深色科技风仪表盘，一屏掌控全局设备状态。
 
 ## 功能一览
 
 - **设备总览仪表盘**：设备总数 / 在线 / 离线 / 告警统计、通信方式分布、环境数据概览、最近告警、近 24 小时在线率趋势
-- **设备管理**：台账列表（表格 / 卡片双视图）、按通信方式与状态筛选、关键词搜索、多字段排序与分页
-- **设备详情**：基本信息、实时温湿度与信号强度、动态曲线（近 1 / 6 / 24 小时）、自动刷新、最近上报记录
+- **设备管理**：台账列表（表格 / 卡片双视图）、按通信方式与状态筛选、关键词搜索、排序与分页、**在线添加设备**（弹窗表单，勾选该设备上报的传感器指标）
+- **设备详情**：基本信息、按设备启用的指标动态展示实时读数与信号强度、动态曲线（近 1 / 6 / 24 小时）、自动刷新、最近上报记录
 - **历史数据**：按设备（多选）、时间范围、数据类型查询，折线图对比、明细表格、CSV 导出
 - **设备地图**：高德地图（可选）或内置坐标分布示意视图，按状态着色，点击查看摘要并跳转详情
 - **告警中心**：告警统计、等级 / 类型 / 状态筛选、展开详情、标记已处理并填写备注
@@ -14,6 +14,23 @@
 - **记事本**：标题 + 正文 + 分类标签，关键词搜索、分类筛选、删除二次确认
 
 全站时间统一对接**北京时间（UTC+8）**。
+
+### 传感器指标（8 类）
+
+一台设备可同时上报任意多个指标（`devices.metrics` 数组），界面按所选指标动态渲染：
+
+| key | 名称 | 单位 |
+| --- | --- | --- |
+| `temperature` | 温度 | ℃ |
+| `humidity` | 湿度 | % |
+| `acceleration` | 加速度 | m/s² |
+| `illuminance` | 光照强度 | lux |
+| `pressure` | 压力 | kPa |
+| `liquid_level` | 液位 | % |
+| `decibel` | 分贝 | dB |
+| `distance` | 距离 | m |
+
+指标标签、单位、颜色、小数位统一维护在 `src/lib/metrics.ts`，新增/调整指标只需改这一处。
 
 ## 技术栈
 
@@ -66,8 +83,8 @@ npm run dev
 ### 2. 执行 SQL 初始化
 
 1. 进入项目 `SQL Editor`
-2. 打开本仓库 `supabase/migrations/001_init.sql`
-3. 全选并点击 `Run`，完成建表、索引、触发器与 RLS 策略
+2. 依次执行 `supabase/migrations/001_init.sql`（建表、索引、触发器与 RLS 策略）、`supabase/migrations/002_metrics.sql`（新增 6 类传感器指标字段，多指标设备必跑）
+3. 可选：执行 `supabase/seed.sql`，填充 27 台演示设备（含 3 台多指标示例：液位+压力 / 光照+分贝 / 加速度+距离）
 
 > 建议使用 Supabase CLI 执行迁移（更规范、可版本化）：
 >
@@ -93,15 +110,15 @@ npm run dev
 
 | 表 | 说明 | 关键字段 |
 | --- | --- | --- |
-| `devices` | 设备 | name、comm_type、status、location、经纬度、current_temp/humidity/signal |
-| `sensor_data` | 传感器数据 | device_id、temperature、humidity、signal_strength、reported_at |
+| `devices` | 设备 | name、comm_type、status、location、经纬度、metrics（启用指标数组）、current_*（各指标当前值）、signal |
+| `sensor_data` | 传感器数据 | device_id、temperature/humidity/acceleration/illuminance/pressure/liquid_level/decibel/distance、signal_strength、reported_at |
 | `alerts` | 告警记录 | device_id、type、level、trigger_value、threshold、status、remark |
 | `calendar_notes` | 日历笔记 | user_id、date、title、content |
 | `memos` | 记事本 | user_id、title、content、category |
 
 - 所有表已开启 **RLS**；`calendar_notes` / `memos` 基于 `auth.uid()` 做用户隔离
 - 时间字段统一存储为 UTC，前端展示时转换为北京时间（UTC+8）
-- 新上报 `sensor_data` 时，触发器会自动更新设备最新读数
+- `devices.metrics` 为 `text[]`，记录该设备启用的指标；触发器 `update_device_latest` 会把最新上报按指标刷到 `devices.current_*` 与 `signal_strength`
 
 ## 部署
 
@@ -157,8 +174,10 @@ zhuzi-monitor/
 ├── tailwind.config.js
 ├── .env.local.example
 ├── supabase/
-│   └── migrations/
-│       └── 001_init.sql
+│   ├── migrations/
+│   │   ├── 001_init.sql
+│   │   └── 002_metrics.sql
+│   └── seed.sql
 └── src/
     ├── main.tsx               # 入口
     ├── App.tsx                # 应用根组件
@@ -167,6 +186,7 @@ zhuzi-monitor/
     │   ├── supabaseClient.ts  # Supabase 客户端（含环境变量回退）
     │   ├── api.ts             # 数据访问公共助手
     │   ├── constants.ts       # 标签 / 颜色映射
+    │   ├── metrics.ts         # 传感器指标目录与取值助手
     │   ├── mockData.ts        # mock 数据生成
     │   └── utils.ts           # 时间格式化等工具
     ├── types/index.ts         # 全局类型
@@ -180,9 +200,9 @@ zhuzi-monitor/
     ├── context/AuthContext.tsx# Supabase Auth + 演示模式
     ├── components/
     │   ├── layout/            # AppLayout / Sidebar / Header
-    │   ├── ui/                # 通用 UI 组件
+    │   ├── ui/                # 通用 UI 组件（含 Modal 弹窗）
     │   ├── charts/            # 图表组件
-    │   └── devices/           # 设备相关组件
+    │   └── devices/           # 设备相关组件（含 DeviceForm 添加设备表单）
     └── pages/                 # 各页面
 ```
 

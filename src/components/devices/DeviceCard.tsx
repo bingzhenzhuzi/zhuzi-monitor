@@ -1,5 +1,6 @@
 import { COMM_TYPE_COLORS, COMM_TYPE_LABELS } from '../../lib/constants'
 import { relativeTime } from '../../lib/utils'
+import { METRIC_MAP, getCurrent, fmtMetric } from '../../lib/metrics'
 import type { Device } from '../../types'
 import { StatusDot } from '../ui/StatusDot'
 
@@ -23,18 +24,14 @@ export function DeviceCard({ device, onOpen }: { device: Device; onOpen: (id: st
       </div>
 
       <div className="grid grid-cols-2 gap-2 rounded-lg bg-white/5 p-2.5 text-center">
-        <div>
-          <div className="font-mono text-lg font-semibold tabular-nums text-slate-200">
-            {device.currentTemp != null ? `${device.currentTemp.toFixed(1)}℃` : '—'}
+        {device.metrics.slice(0, 2).map((m) => (
+          <div key={m}>
+            <div className="font-mono text-lg font-semibold tabular-nums" style={{ color: METRIC_MAP[m].color }}>
+              {fmtMetric(m, getCurrent(device, m))}
+            </div>
+            <div className="text-[10px] text-slate-500">{METRIC_MAP[m].label}</div>
           </div>
-          <div className="text-[10px] text-slate-500">温度</div>
-        </div>
-        <div>
-          <div className="font-mono text-lg font-semibold tabular-nums text-slate-200">
-            {device.currentHumidity != null ? `${device.currentHumidity.toFixed(1)}%` : '—'}
-          </div>
-          <div className="text-[10px] text-slate-500">湿度</div>
-        </div>
+        ))}
       </div>
 
       <div className="text-xs text-slate-500">

@@ -24,6 +24,17 @@ export type AlertType =
 /** 告警处理状态 */
 export type AlertStatus = 'pending' | 'processing' | 'resolved'
 
+/** 传感器指标 key（signal_strength 单独作为设备通信质量，不计入） */
+export type MetricKey =
+  | 'temperature'
+  | 'humidity'
+  | 'acceleration'
+  | 'illuminance'
+  | 'pressure'
+  | 'liquid_level'
+  | 'decibel'
+  | 'distance'
+
 /** 设备 */
 export interface Device {
   id: string
@@ -40,14 +51,28 @@ export interface Device {
   currentTemp: number | null
   currentHumidity: number | null
   signalStrength: number | null
+  /** 该设备启用的传感器指标（决定界面显示哪些读数/曲线） */
+  metrics: MetricKey[]
+  currentAcceleration: number | null
+  currentIlluminance: number | null
+  currentPressure: number | null
+  currentLiquidLevel: number | null
+  currentDecibel: number | null
+  currentDistance: number | null
 }
 
 /** 传感器数据点 */
 export interface SensorDataPoint {
   id: string
   deviceId: string
-  temperature: number
-  humidity: number
+  temperature: number | null
+  humidity: number | null
+  acceleration: number | null
+  illuminance: number | null
+  pressure: number | null
+  liquidLevel: number | null
+  decibel: number | null
+  distance: number | null
   signalStrength: number | null
   reportedAt: string
 }

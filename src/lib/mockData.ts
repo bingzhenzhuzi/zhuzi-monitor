@@ -14,9 +14,11 @@ import type {
   DeviceSummary,
   Memo,
   SensorDataPoint,
+  MetricKey,
 } from '../types'
 import { COMM_TYPES, ALERT_TYPES, ALERT_LEVELS } from './constants'
 import { round1, clamp, toBeijingDateKey } from './utils'
+import { getCurrent } from './metrics'
 
 // 可复现伪随机数
 function mulberry32(seed: number) {
@@ -50,6 +52,70 @@ const SITES = [
 ]
 const FW = ['v2.4.1', 'v2.4.0', 'v2.3.8', 'v2.3.7']
 
+// ------------------------- 传感器指标 mock -------------------------
+
+const METRIC_RANGES: Record<MetricKey, [number, number]> = {
+  temperature: [18, 32],
+  humidity: [30, 80],
+  acceleration: [0, 3],
+  illuminance: [50, 1000],
+  pressure: [95, 105],
+  liquid_level: [20, 95],
+  decibel: [30, 90],
+  distance: [0.1, 10],
+}
+
+const METRIC_DEFAULT: Record<MetricKey, number> = {
+  temperature: 24,
+  humidity: 52,
+  acceleration: 1.2,
+  illuminance: 400,
+  pressure: 101,
+  liquid_level: 60,
+  decibel: 55,
+  distance: 2.5,
+}
+
+// 部分设备使用非默认的多指标组合，其余默认温湿度
+const METRIC_PRESETS: MetricKey[][] = [
+  ['temperature', 'humidity'],
+  ['temperature', 'humidity'],
+  ['temperature', 'humidity', 'pressure'],
+  ['illuminance', 'decibel'],
+  ['liquid_level'],
+  ['acceleration', 'distance'],
+  ['pressure', 'liquid_level'],
+]
+
+function setPoint(p: SensorDataPoint, key: MetricKey, value: number) {
+  switch (key) {
+    case 'temperature':
+      p.temperature = value
+      break
+    case 'humidity':
+      p.humidity = value
+      break
+    case 'acceleration':
+      p.acceleration = value
+      break
+    case 'illuminance':
+      p.illuminance = value
+      break
+    case 'pressure':
+      p.pressure = value
+      break
+    case 'liquid_level':
+      p.liquidLevel = value
+      break
+    case 'decibel':
+      p.decibel = value
+      break
+    case 'distance':
+      p.distance = value
+      break
+  }
+}
+
 // ------------------------- 设备 -------------------------
 
 let cachedDevices: Device[] | null = null
@@ -65,11 +131,17 @@ export function mockDevices(): Device[] {
     const isOffline = i % 9 === 0
     const isAlert = !isOffline && i % 7 === 0
     const status = isOffline ? 'offline' : isAlert ? 'alert' : 'online'
+    const metrics = METRIC_PRESETS[i % METRIC_PRESETS.length]
 
-    const baseTemp = 22 + (rand() - 0.5) * 8
-    const baseHum = 45 + (rand() - 0.5) * 30
     const lastReport = new Date(now - (isOffline ? randInt(3600, 7200) : randInt(0, 60)) * 1000)
     const site = pick(SITES)
+
+    // 为启用的指标生成当前值（离线设备全部为 null）
+    const vals = {} as Record<MetricKey, number | null>
+    for (const m of Object.keys(METRIC_RANGES) as MetricKey[]) {
+      const [min, max] = METRIC_RANGES[m]
+      vals[m] = status === 'offline' || !metrics.includes(m) ? null : round1(min + rand() * (max - min))
+    }
 
     devices.push({
       id: `dev-${String(i + 1).padStart(3, '0')}`,
@@ -83,9 +155,16 @@ export function mockDevices(): Device[] {
       longitude: round1(104 + rand() * 18),
       onlineSince: new Date(now - randInt(10, 90) * 86400000).toISOString(),
       lastReportAt: lastReport.toISOString(),
-      currentTemp: status === 'offline' ? null : round1(baseTemp + (status === 'alert' ? 8 : 0)),
-      currentHumidity: status === 'offline' ? null : round1(clamp(baseHum, 20, 90)),
+      currentTemp: vals.temperature,
+      currentHumidity: vals.humidity,
       signalStrength: status === 'offline' ? null : randInt(55, 99),
+      metrics,
+      currentAcceleration: vals.acceleration,
+      currentIlluminance: vals.illuminance,
+      currentPressure: vals.pressure,
+      currentLiquidLevel: vals.liquid_level,
+      currentDecibel: vals.decibel,
+      currentDistance: vals.distance,
     })
   }
 
@@ -95,6 +174,11 @@ export function mockDevices(): Device[] {
 
 export function getMockDevice(id: string): Device | undefined {
   return mockDevices().find((d) => d.id === id)
+}
+
+/** 前端「添加设备」在 mock 模式下追加到缓存 */
+export function pushMockDevice(device: Device): void {
+  mockDevices().unshift(device)
 }
 
 export function getMockDeviceSummary(): DeviceSummary {
@@ -156,21 +240,33 @@ export function mockSeries(deviceId: string, hours: number): SensorDataPoint[] {
   const step = 5 * 60 * 1000
   const total = Math.floor((hours * 3600000) / step)
   const now = Date.now()
-  const baseTemp = device?.currentTemp ?? 23
-  const baseHum = device?.currentHumidity ?? 48
   const baseSignal = device?.signalStrength ?? 75
+  const metrics: MetricKey[] = device?.metrics?.length ? device.metrics : ['temperature', 'humidity']
 
   const points: SensorDataPoint[] = []
   for (let i = total; i >= 0; i--) {
     const t = new Date(now - i * step)
-    points.push({
+    const p: SensorDataPoint = {
       id: `${deviceId}-${t.getTime()}`,
       deviceId,
-      temperature: round1(baseTemp + Math.sin(i / 6) * 2.5 + (r() - 0.5) * 1.5),
-      humidity: round1(clamp(baseHum + Math.cos(i / 9) * 6 + (r() - 0.5) * 4, 0, 100)),
+      temperature: null,
+      humidity: null,
+      acceleration: null,
+      illuminance: null,
+      pressure: null,
+      liquidLevel: null,
+      decibel: null,
+      distance: null,
       signalStrength: clamp(baseSignal + Math.floor((r() - 0.5) * 10), 0, 100),
       reportedAt: t.toISOString(),
+    }
+    metrics.forEach((m, idx) => {
+      const current = device ? getCurrent(device, m) : null
+      const base = current ?? METRIC_DEFAULT[m]
+      const val = round1(base + Math.sin(i / 6 + idx) * base * 0.08 + (r() - 0.5) * base * 0.05)
+      setPoint(p, m, val)
     })
+    points.push(p)
   }
   return points
 }

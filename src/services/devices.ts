@@ -1,8 +1,8 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { mockResponse } from '../lib/api'
-import { mockDevices, getMockDevice, getMockDeviceSummary } from '../lib/mockData'
+import { mockDevices, getMockDevice, getMockDeviceSummary, pushMockDevice } from '../lib/mockData'
 import { COMM_TYPES } from '../lib/constants'
-import type { CommType, Device, DeviceStatus, DeviceSummary } from '../types'
+import type { CommType, Device, DeviceStatus, DeviceSummary, MetricKey } from '../types'
 
 // Supabase 行结构（snake_case）
 interface DeviceRow {
@@ -20,6 +20,13 @@ interface DeviceRow {
   current_temp: number | null
   current_humidity: number | null
   signal_strength: number | null
+  metrics: MetricKey[]
+  current_acceleration: number | null
+  current_illuminance: number | null
+  current_pressure: number | null
+  current_liquid_level: number | null
+  current_decibel: number | null
+  current_distance: number | null
 }
 
 function mapDevice(row: DeviceRow): Device {
@@ -38,6 +45,13 @@ function mapDevice(row: DeviceRow): Device {
     currentTemp: row.current_temp,
     currentHumidity: row.current_humidity,
     signalStrength: row.signal_strength,
+    metrics: row.metrics ?? ['temperature', 'humidity'],
+    currentAcceleration: row.current_acceleration,
+    currentIlluminance: row.current_illuminance,
+    currentPressure: row.current_pressure,
+    currentLiquidLevel: row.current_liquid_level,
+    currentDecibel: row.current_decibel,
+    currentDistance: row.current_distance,
   }
 }
 
@@ -140,4 +154,63 @@ export async function getDeviceSummary(): Promise<DeviceSummary> {
     abnormalTempCount: abnormalTemp,
     abnormalHumidityCount: abnormalHum,
   }
+}
+
+export interface DeviceInput {
+  name: string
+  code: string
+  commType: CommType
+  metrics: MetricKey[]
+  location?: string
+  latitude?: number | null
+  longitude?: number | null
+  firmwareVersion?: string
+}
+
+/** 新建设备（前端「添加设备」入口） */
+export async function createDevice(input: DeviceInput): Promise<Device> {
+  if (!isSupabaseConfigured || !supabase) {
+    const device: Device = {
+      id: `dev-${Date.now()}`,
+      name: input.name,
+      code: input.code,
+      commType: input.commType,
+      status: 'offline',
+      firmwareVersion: input.firmwareVersion ?? null,
+      location: input.location ?? null,
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
+      onlineSince: null,
+      lastReportAt: null,
+      currentTemp: null,
+      currentHumidity: null,
+      signalStrength: null,
+      metrics: input.metrics,
+      currentAcceleration: null,
+      currentIlluminance: null,
+      currentPressure: null,
+      currentLiquidLevel: null,
+      currentDecibel: null,
+      currentDistance: null,
+    }
+    pushMockDevice(device)
+    return mockResponse(device)
+  }
+
+  const { data, error } = await supabase
+    .from('devices')
+    .insert({
+      name: input.name,
+      code: input.code,
+      comm_type: input.commType,
+      metrics: input.metrics,
+      location: input.location ?? null,
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
+      firmware_version: input.firmwareVersion ?? null,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return mapDevice(data as DeviceRow)
 }

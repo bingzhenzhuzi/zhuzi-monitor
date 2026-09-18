@@ -6,8 +6,14 @@ import type { SensorDataPoint } from '../types'
 interface SensorRow {
   id: string
   device_id: string
-  temperature: number
-  humidity: number
+  temperature: number | null
+  humidity: number | null
+  acceleration: number | null
+  illuminance: number | null
+  pressure: number | null
+  liquid_level: number | null
+  decibel: number | null
+  distance: number | null
   signal_strength: number | null
   reported_at: string
 }
@@ -18,6 +24,12 @@ function mapSensor(row: SensorRow): SensorDataPoint {
     deviceId: row.device_id,
     temperature: row.temperature,
     humidity: row.humidity,
+    acceleration: row.acceleration,
+    illuminance: row.illuminance,
+    pressure: row.pressure,
+    liquidLevel: row.liquid_level,
+    decibel: row.decibel,
+    distance: row.distance,
     signalStrength: row.signal_strength,
     reportedAt: row.reported_at,
   }

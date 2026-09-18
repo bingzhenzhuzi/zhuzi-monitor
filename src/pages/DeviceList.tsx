@@ -4,6 +4,7 @@ import { useDevices } from '../hooks/useDevices'
 import { DeviceFilters, type DeviceFilterValues } from '../components/devices/DeviceFilters'
 import { DeviceTable, type DeviceSort, type DeviceSortKey } from '../components/devices/DeviceTable'
 import { DeviceCard } from '../components/devices/DeviceCard'
+import { DeviceForm } from '../components/devices/DeviceForm'
 import { Loading, ErrorState, EmptyState } from '../components/ui/feedback'
 import { cx } from '../lib/utils'
 import type { CommType, Device, DeviceStatus } from '../types'
@@ -14,14 +15,8 @@ function sortDevices(devices: Device[], sort: DeviceSort): Device[] {
   const dir = sort.dir === 'asc' ? 1 : -1
   return [...devices].sort((a, b) => {
     if (sort.key === 'name') return a.name.localeCompare(b.name) * dir
-    if (sort.key === 'lastReportAt') {
-      return ((a.lastReportAt ? new Date(a.lastReportAt).getTime() : 0) -
-        (b.lastReportAt ? new Date(b.lastReportAt).getTime() : 0)) * dir
-    }
-    if (sort.key === 'currentTemp') {
-      return ((a.currentTemp ?? -999) - (b.currentTemp ?? -999)) * dir
-    }
-    return ((a.currentHumidity ?? -999) - (b.currentHumidity ?? -999)) * dir
+    return ((a.lastReportAt ? new Date(a.lastReportAt).getTime() : 0) -
+      (b.lastReportAt ? new Date(b.lastReportAt).getTime() : 0)) * dir
   })
 }
 
@@ -37,6 +32,7 @@ export function DeviceList() {
   const [view, setView] = useState<'table' | 'card'>('table')
   const [sort, setSort] = useState<DeviceSort>({ key: 'name', dir: 'asc' })
   const [page, setPage] = useState(1)
+  const [showForm, setShowForm] = useState(false)
 
   const query = useDevices(filters)
 
@@ -55,6 +51,9 @@ export function DeviceList() {
         <DeviceFilters value={filters} onChange={(v) => { setFilters(v); setPage(1) }} />
 
         <div className="flex items-center gap-2">
+          <button className="btn-primary" onClick={() => setShowForm(true)}>
+            ＋ 添加设备
+          </button>
           <div className="flex rounded-lg bg-white/5 p-0.5">
             <button
               className={cx('rounded-md px-3 py-1 text-sm', view === 'table' ? 'bg-accent/15 text-cyan-300' : 'text-slate-400')}
@@ -107,6 +106,9 @@ export function DeviceList() {
           </div>
         </div>
       )}
+
+      {/* 添加设备弹窗 */}
+      <DeviceForm open={showForm} onClose={() => setShowForm(false)} />
     </div>
   )
 }

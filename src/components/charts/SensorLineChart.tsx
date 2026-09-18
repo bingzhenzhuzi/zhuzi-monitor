@@ -23,7 +23,7 @@ export function SensorLineChart({
   unit = '',
   height = 280,
 }: {
-  data: Array<Record<string, number | string>>
+  data: Array<Record<string, number | string | null>>
   lines: ChartLine[]
   xKey?: string
   unit?: string

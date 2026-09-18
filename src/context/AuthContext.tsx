@@ -99,7 +99,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(u)
         return {}
       }
-      const { error } = await supabase!.auth.signUp({ email, password })
+      const { error } = await supabase!.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: window.location.origin },
+      })
       return error ? { error: error.message } : {}
     },
     [demoMode],

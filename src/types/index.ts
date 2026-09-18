@@ -92,6 +92,18 @@ export interface Alert {
   resolvedAt: string | null
 }
 
+/** 设备告警阈值（每设备 × 每指标；min/max 为空表示不判该方向） */
+export interface AlertThreshold {
+  id: string
+  deviceId: string
+  metric: MetricKey
+  minValue: number | null
+  maxValue: number | null
+}
+
+/** 某设备的阈值表：metric -> { min, max } */
+export type DeviceThresholds = Record<MetricKey, { min: number | null; max: number | null }>
+
 /** 日历笔记 */
 export interface CalendarNote {
   id: string

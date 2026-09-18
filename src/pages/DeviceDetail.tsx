@@ -2,6 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useDevice } from '../hooks/useDevices'
 import { useSensorSeries } from '../hooks/useSensorData'
+import { useDeviceThresholds } from '../hooks/useAlertThresholds'
 import { Card } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge'
 import { StatusDot } from '../components/ui/StatusDot'
@@ -24,11 +25,11 @@ const REFRESH_OPTIONS = [
 
 const DEFAULT_METRICS: MetricKey[] = ['temperature', 'humidity']
 
-/** 指标异常判定（仅温湿度有阈值，新指标后续扩展） */
-function isAbnormal(m: MetricKey, v: number | null): boolean {
-  if (v == null) return false
-  if (m === 'temperature') return v > 35 || v < 5
-  if (m === 'humidity') return v > 80 || v < 20
+/** 指标异常判定：按配置阈值判断过高（>max）/ 过低（<min） */
+function isAbnormal(v: number | null, t?: { min: number | null; max: number | null }): boolean {
+  if (v == null || !t) return false
+  if (t.max != null && v > t.max) return true
+  if (t.min != null && v < t.min) return true
   return false
 }
 
@@ -39,6 +40,7 @@ export function DeviceDetail() {
 
   const device = useDevice(id)
   const series = useSensorSeries(id, range, refresh || undefined)
+  const thresholds = useDeviceThresholds(device.data?.id)
 
   const metrics: MetricKey[] = device.data?.metrics?.length ? device.data.metrics : DEFAULT_METRICS
 
@@ -133,7 +135,7 @@ export function DeviceDetail() {
               value={fmtMetric(m, getCurrent(d, m))}
               color={METRIC_MAP[m].color}
               trend={trendByMetric[m] ?? []}
-              abnormal={isAbnormal(m, getCurrent(d, m))}
+              abnormal={isAbnormal(getCurrent(d, m), thresholds.data?.[m])}
             />
           ))}
           <div className="card border border-white/5 bg-base-900 p-4">

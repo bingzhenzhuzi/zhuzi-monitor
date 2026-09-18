@@ -4,6 +4,7 @@ import { Card } from '../components/ui/Card'
 import { StatCard } from '../components/ui/StatCard'
 import { Badge } from '../components/ui/Badge'
 import { Loading, ErrorState, EmptyState } from '../components/ui/feedback'
+import { ThresholdForm } from '../components/alerts/ThresholdForm'
 import {
   ALERT_TYPES,
   ALERT_TYPE_LABELS,
@@ -27,6 +28,7 @@ export function AlertCenter() {
   const [status, setStatus] = useState<AlertStatus | 'all'>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [remark, setRemark] = useState('')
+  const [showThreshold, setShowThreshold] = useState(false)
 
   const alerts = useAlerts({ level, type, status })
 
@@ -46,26 +48,31 @@ export function AlertCenter() {
         <StatCard label="重要" value={summary.data?.byLevel.major ?? '—'} accent="#f59e0b" icon="🟠" />
       </div>
 
-      {/* 筛选 */}
-      <div className="flex flex-wrap items-center gap-3">
-        <select className="select" value={level} onChange={(e) => setLevel(e.target.value as AlertLevel | 'all')}>
-          <option value="all">全部等级</option>
-          {ALERT_LEVELS.map((l) => (
-            <option key={l} value={l}>{ALERT_LEVEL_LABELS[l]}</option>
-          ))}
-        </select>
-        <select className="select" value={type} onChange={(e) => setType(e.target.value as AlertType | 'all')}>
-          <option value="all">全部类型</option>
-          {ALERT_TYPES.map((t) => (
-            <option key={t} value={t}>{ALERT_TYPE_LABELS[t]}</option>
-          ))}
-        </select>
-        <select className="select" value={status} onChange={(e) => setStatus(e.target.value as AlertStatus | 'all')}>
-          <option value="all">全部处理状态</option>
-          {Object.entries(ALERT_STATUS_LABELS).map(([k, v]) => (
-            <option key={k} value={k}>{v}</option>
-          ))}
-        </select>
+      {/* 筛选 + 阈值设置 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <select className="select" value={level} onChange={(e) => setLevel(e.target.value as AlertLevel | 'all')}>
+            <option value="all">全部等级</option>
+            {ALERT_LEVELS.map((l) => (
+              <option key={l} value={l}>{ALERT_LEVEL_LABELS[l]}</option>
+            ))}
+          </select>
+          <select className="select" value={type} onChange={(e) => setType(e.target.value as AlertType | 'all')}>
+            <option value="all">全部类型</option>
+            {ALERT_TYPES.map((t) => (
+              <option key={t} value={t}>{ALERT_TYPE_LABELS[t]}</option>
+            ))}
+          </select>
+          <select className="select" value={status} onChange={(e) => setStatus(e.target.value as AlertStatus | 'all')}>
+            <option value="all">全部处理状态</option>
+            {Object.entries(ALERT_STATUS_LABELS).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+        </div>
+        <button className="btn-primary" onClick={() => setShowThreshold(true)}>
+          阈值设置
+        </button>
       </div>
 
       {/* 列表 */}
@@ -144,6 +151,9 @@ export function AlertCenter() {
           </ul>
         )}
       </Card>
+
+      {/* 阈值设置弹窗 */}
+      <ThresholdForm open={showThreshold} onClose={() => setShowThreshold(false)} />
     </div>
   )
 }

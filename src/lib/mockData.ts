@@ -347,6 +347,37 @@ export function mockAlerts(): Alert[] {
   return alerts
 }
 
+// ------------------------- 告警阈值 -------------------------
+
+const DEFAULT_THRESHOLDS: Record<MetricKey, { min: number | null; max: number | null }> = {
+  temperature: { min: 5, max: 35 },
+  humidity: { min: 20, max: 80 },
+  acceleration: { min: null, max: null },
+  illuminance: { min: null, max: null },
+  pressure: { min: null, max: null },
+  liquid_level: { min: null, max: null },
+  decibel: { min: null, max: null },
+  distance: { min: null, max: null },
+}
+
+const thresholdStore = new Map<string, Record<MetricKey, { min: number | null; max: number | null }>>()
+
+export function getMockThresholds(deviceId: string): Record<MetricKey, { min: number | null; max: number | null }> {
+  return thresholdStore.get(deviceId) ?? { ...DEFAULT_THRESHOLDS }
+}
+
+export function saveMockThresholds(
+  deviceId: string,
+  entries: Array<{ metric: MetricKey; minValue: number | null; maxValue: number | null }>,
+): void {
+  const current = getMockThresholds(deviceId)
+  const next = { ...current }
+  for (const e of entries) {
+    next[e.metric] = { min: e.minValue, max: e.maxValue }
+  }
+  thresholdStore.set(deviceId, next)
+}
+
 // ------------------------- 日历笔记 -------------------------
 
 export function mockCalendarNotes(): CalendarNote[] {
